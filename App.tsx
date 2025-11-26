@@ -180,7 +180,7 @@ const App: React.FC = () => {
           message="Are you sure you want to delete the saved tournament? This cannot be undone."
           confirmText="Delete Tournament"
         />
-        <ToastContainer position="bottom-right" theme="dark" />
+        <ToastContainer position="top-right" theme="dark" aria-label="Toast Notification Container" />
       </div>
     );
   }
@@ -281,7 +281,7 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
-      <ToastContainer position="bottom-right" theme="dark" />
+      <ToastContainer position="top-right" theme="dark" aria-label="Toast Notification Container" />
     </div>
   );
 };
