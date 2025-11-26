@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
 import { Match, MatchStatus, Stage, Team } from '../types';
 import { Button } from './Button';
 
@@ -59,7 +60,7 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
 
         if (isKnockout && isDraw) {
             if (tempScores.hp === '' || tempScores.ap === '') {
-                alert("Knockout matches cannot end in a draw. Please enter penalty scores.");
+                toast.error("Knockout matches cannot end in a draw. Please enter penalty scores.");
                 return;
             }
 
@@ -67,7 +68,7 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
             ap = parseInt(tempScores.ap);
 
             if (hp === ap) {
-                alert("Penalty shootout cannot end in a draw. Please enter a winner.");
+                toast.error("Penalty shootout cannot end in a draw. Please enter a winner.");
                 return;
             }
         }
