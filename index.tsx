@@ -16,8 +16,16 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string}>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+  <ClerkProvider
+    publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string}
+    appearance={{
+      
+      layout: {
+        unsafe_disableDevelopmentModeWarnings: true,
+      },
+    }}
+  >
+    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <BrowserRouter>
           <App />
         </BrowserRouter>
