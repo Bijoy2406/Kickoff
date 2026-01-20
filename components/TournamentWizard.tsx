@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TournamentType } from '../types';
 import { Button } from './Button';
+import { getFirstKnockoutRoundName } from '../utils/tournamentUtils';
 
 interface TournamentWizardProps {
-  onCreate: (name: string, type: TournamentType, teams: string[]) => void;
+  onCreate: (name: string, type: TournamentType, teams: string[], numGroups?: number, advancingPerGroup?: number) => void;
 }
 
 export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onCreate }) => {
@@ -12,16 +13,63 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onCreate }) 
   const [teamCount, setTeamCount] = useState(4);
   const [teams, setTeams] = useState<string[]>(Array(4).fill(''));
   const [isGenerating, setIsGenerating] = useState(false);
+  const [numGroups, setNumGroups] = useState(2);
+  const [advancingPerGroup, setAdvancingPerGroup] = useState(2);
+  const [numGroupsInput, setNumGroupsInput] = useState('2');
+  const [advancingInput, setAdvancingInput] = useState('2');
+  const [teamCountInput, setTeamCountInput] = useState('4');
 
-  const handleTeamCountChange = (count: number) => {
-    setTeamCount(count);
+  // Calculate the first knockout round name based on current settings
+  const firstKnockoutRound = useMemo(() => {
+    return getFirstKnockoutRoundName(numGroups, advancingPerGroup);
+  }, [numGroups, advancingPerGroup]);
+
+  // Calculate teams per group
+  const teamsPerGroup = useMemo(() => {
+    return Math.floor(teamCount / numGroups);
+  }, [teamCount, numGroups]);
+
+  // Validation checks
+  const hasUnevenGroups = teamCount % numGroups !== 0;
+  const advancingTooMany = advancingPerGroup > teamsPerGroup;
+  const hasInvalidConfig = hasUnevenGroups || advancingTooMany;
+  const isFormValid = type === TournamentType.LEAGUE || !hasInvalidConfig;
+
+  const sanitizeNumber = (rawValue: string, min: number, max: number) => {
+    const cleaned = rawValue.replace(/^-+/, '').replace(/[^0-9]/g, '');
+    if (cleaned === '') return { input: '', value: null as number | null };
+    const parsed = parseInt(cleaned, 10);
+    const clamped = Math.min(max, Math.max(min, parsed));
+    return { input: String(clamped), value: clamped };
+  };
+  
+  const handleTeamCountChange = (rawValue: string) => {
+    const { input, value } = sanitizeNumber(rawValue, 2, 64);
+    setTeamCountInput(input);
+    if (value === null) return;
+  
+    setTeamCount(value);
     setTeams(prev => {
       const newTeams = [...prev];
-      if (count > prev.length) {
-        return [...newTeams, ...Array(count - prev.length).fill('')];
+      if (value > prev.length) {
+        return [...newTeams, ...Array(value - prev.length).fill('')];
       }
-      return newTeams.slice(0, count);
+      return newTeams.slice(0, value);
     });
+  };
+  
+  const handleNumGroupsChange = (rawValue: string) => {
+    const { input, value } = sanitizeNumber(rawValue, 1, 16);
+    setNumGroupsInput(input);
+    if (value === null) return;
+    setNumGroups(value);
+  };
+  
+  const handleAdvancingChange = (rawValue: string) => {
+    const { input, value } = sanitizeNumber(rawValue, 1, 16);
+    setAdvancingInput(input);
+    if (value === null) return;
+    setAdvancingPerGroup(value);
   };
 
   const handleTeamNameChange = (index: number, value: string) => {
@@ -34,7 +82,11 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onCreate }) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onCreate(name, type, teams);
+    if (type === TournamentType.GROUPS_KNOCKOUT) {
+      onCreate(name, type, teams, numGroups, advancingPerGroup);
+    } else {
+      onCreate(name, type, teams);
+    }
   };
 
   return (
@@ -86,21 +138,80 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onCreate }) 
           </div>
         </div>
 
+        {/* Group Settings - Only show for Groups + Knockout */}
+        {type === TournamentType.GROUPS_KNOCKOUT && (
+          <div className="space-y-4 p-4 bg-slate-900/50 rounded-lg border border-slate-700">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Number of Groups */}
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Number of Groups</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="16"
+                  value={numGroupsInput}
+                  onChange={(e) => handleNumGroupsChange(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Advancing Per Group */}
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Advancing Per Group</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="16"
+                  value={advancingInput}
+                  onChange={(e) => handleAdvancingChange(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Knockout Round Estimation */}
+            <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+              <div className="text-sm text-slate-400">
+                <span className="font-medium text-white">{teamsPerGroup}</span> teams per group
+              </div>
+              <div className="text-sm">
+                <span className="text-slate-400">First Knockout Round: </span>
+                <span className="font-bold text-emerald-400">{firstKnockoutRound}</span>
+              </div>
+            </div>
+
+            {/* Validation Warnings */}
+            {hasUnevenGroups && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                ❌ {teamCount} teams cannot be evenly divided into {numGroups} groups. Each group would have {teamsPerGroup} teams with {teamCount % numGroups} team(s) remaining.
+              </div>
+            )}
+            
+            {!hasUnevenGroups && advancingTooMany && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                ❌ Cannot advance {advancingPerGroup} teams per group when each group only has {teamsPerGroup} teams.
+              </div>
+            )}
+
+            {!hasInvalidConfig && firstKnockoutRound === 'Play-off' && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+                ⚠️ {numGroups * advancingPerGroup} advancing teams is not a power of 2. A play-off round will be needed.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Team Count */}
         <div>
           <label className="block text-sm font-medium text-slate-400 mb-2">Number of Teams</label>
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min="2"
-              max="16"
-              step={type === TournamentType.GROUPS_KNOCKOUT ? 2 : 1} // Groups usually even
-              value={teamCount}
-              onChange={(e) => handleTeamCountChange(parseInt(e.target.value))}
-              className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-            />
-            <span className="text-xl font-bold text-white w-8 text-center">{teamCount}</span>
-          </div>
+          <input
+            type="number"
+            min="2"
+            max="64"
+            value={teamCountInput}
+            onChange={(e) => handleTeamCountChange(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+          />
         </div>
 
         {/* Teams Inputs */}
@@ -124,7 +235,7 @@ export const TournamentWizard: React.FC<TournamentWizardProps> = ({ onCreate }) 
           </div>
         </div>
 
-        <Button type="submit" size="lg" className="w-full mt-8">
+        <Button type="submit" size="lg" className="w-full mt-8" disabled={!isFormValid}>
           Start Tournament
         </Button>
       </form>

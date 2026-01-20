@@ -7,12 +7,14 @@ interface MatchesViewProps {
     matches: Match[];
     teams: Team[];
     onUpdateMatch: (matchId: string, homeScore: number, awayScore: number, homePenalty?: number, awayPenalty?: number) => void;
+    readOnly?: boolean;
 }
 
-export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpdateMatch }) => {
+export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpdateMatch, readOnly }) => {
     const getTeam = (id: string) => teams.find(t => t.id === id);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [tempScores, setTempScores] = useState<{ h: string, a: string, hp: string, ap: string }>({ h: '', a: '', hp: '', ap: '' });
+    const isReadOnly = readOnly ?? false;
 
     const handleEdit = (match: Match) => {
         setEditingId(match.id);
@@ -145,7 +147,7 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
 
                                 const isTBD = !home || !away;
 
-                                const isEditing = editingId === match.id;
+                                const isEditing = !isReadOnly && editingId === match.id;
                                 const isFinished = match.status === MatchStatus.FINISHED;
                                 const isKnockout = match.stage !== Stage.GROUP;
 
@@ -255,21 +257,23 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="mt-4 pt-3 border-t border-slate-700 flex justify-end">
-                                            {isEditing ? (
-                                                <div className="flex gap-2">
-                                                    <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
-                                                    <Button size="sm" onClick={() => handleSave(match)}>
-                                                        Save Score
+                                        {!isReadOnly && (
+                                            <div className="mt-4 pt-3 border-t border-slate-700 flex justify-end">
+                                                {isEditing ? (
+                                                    <div className="flex gap-2">
+                                                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                                                        <Button size="sm" onClick={() => handleSave(match)}>
+                                                            Save Score
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    // Only allow editing if teams are determined
+                                                    <Button size="sm" variant="secondary" onClick={() => handleEdit(match)} disabled={isTBD}>
+                                                        {isFinished ? 'Edit Result' : (isTBD ? 'Waiting for Teams' : 'Enter Score')}
                                                     </Button>
-                                                </div>
-                                            ) : (
-                                                // Only allow editing if teams are determined
-                                                <Button size="sm" variant="secondary" onClick={() => handleEdit(match)} disabled={isTBD}>
-                                                    {isFinished ? 'Edit Result' : (isTBD ? 'Waiting for Teams' : 'Enter Score')}
-                                                </Button>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

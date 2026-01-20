@@ -54,6 +54,8 @@ export interface Tournament {
   groups: string[]; // Array of group names e.g. ['A', 'B']
   currentStage: Stage;
   createdAt: number;
+  numGroups?: number; // Number of groups in tournament
+  advancingPerGroup?: number; // Number of teams advancing from each group
 }
 
 export interface CreateTournamentFormData {
