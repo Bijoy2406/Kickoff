@@ -5,9 +5,10 @@ import { getMatchWinner } from '../utils/tournamentUtils';
 interface BracketViewProps {
   matches: Match[];
   teams: Team[];
+  groups?: string[];
 }
 
-export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
+export const BracketView: React.FC<BracketViewProps> = ({ matches, teams, groups = [] }) => {
   const [isGroupsVisible, setIsGroupsVisible] = useState(true);
   const getTeam = (id: string) => teams.find(t => t.id === id);
   
@@ -16,7 +17,11 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
   const quarters = matches.filter(m => m.stage === Stage.QUARTER_FINAL);
   const semis = matches.filter(m => m.stage === Stage.SEMI_FINAL);
   const final = matches.find(m => m.stage === Stage.FINAL);
-  const groupNames = Array.from(new Set(groupMatches.map(m => m.group).filter(Boolean))) as string[];
+  const groupNames = Array.from(new Set([
+    ...groups,
+    ...teams.map(team => team.group).filter(Boolean) as string[],
+    ...groupMatches.map(match => match.group).filter(Boolean) as string[],
+  ]));
   const hasRoundOf16 = roundOf16.length > 0;
   const hasQuarters = quarters.length > 0;
 
@@ -107,7 +112,13 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
                             <div key={groupName} className="bg-slate-900/40 p-3 rounded-xl border border-dashed border-slate-700">
                                  <div className="text-xs font-bold text-slate-500 uppercase mb-3 px-1">Group {groupName} Matches</div>
                                  <div className="flex flex-col gap-3">
-                                    {matchesInGroup.map(match => renderMatchNode(match, undefined, false, true))}
+                                    {matchesInGroup.length > 0 ? (
+                                      matchesInGroup.map(match => renderMatchNode(match, undefined, false, true))
+                                    ) : (
+                                      <div className="w-64 rounded-lg border border-dashed border-slate-700 bg-slate-900/20 px-4 py-6 text-sm text-slate-500">
+                                        No saved group-stage matches for this group.
+                                      </div>
+                                    )}
                                  </div>
                             </div>
                         );

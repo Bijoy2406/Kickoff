@@ -18,6 +18,19 @@ import { UserHandler } from './components/UserHandler';
 
 const loginPath = import.meta.env.VITE_LOGIN_URL || '/login';
 
+const normalizeTournament = (rawTournament: Tournament): Tournament => {
+  const derivedGroups = Array.from(new Set([
+    ...(rawTournament.groups ?? []),
+    ...rawTournament.teams.map(team => team.group).filter(Boolean) as string[],
+    ...rawTournament.matches.map(match => match.group).filter(Boolean) as string[],
+  ]));
+
+  return {
+    ...rawTournament,
+    groups: derivedGroups,
+  };
+};
+
 const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black">
@@ -120,7 +133,7 @@ const PublicTournamentPage: React.FC = () => {
 
   const tournament = useMemo(() => {
     if (!tournamentDoc) return null;
-    return tournamentDoc.data as Tournament;
+    return normalizeTournament(tournamentDoc.data as Tournament);
   }, [tournamentDoc]);
 
   const [activeTab, setActiveTab] = useState<'standings' | 'matches' | 'bracket'>('standings');
@@ -227,7 +240,7 @@ const PublicTournamentPage: React.FC = () => {
 
             {activeTab === 'bracket' && (
               <div className="overflow-x-auto pb-8">
-                <BracketView matches={tournament.matches} teams={tournament.teams} />
+                <BracketView matches={tournament.matches} teams={tournament.teams} groups={tournament.groups} />
               </div>
             )}
           </div>
@@ -335,7 +348,7 @@ const AdminDashboard: React.FC = () => {
 
     if (loadedPublicId === adminPublicId) return;
 
-    setTournament(tournamentDocFromUrl.data as Tournament);
+    setTournament(normalizeTournament(tournamentDocFromUrl.data as Tournament));
     setTournamentDocId(tournamentDocFromUrl._id as unknown as string);
     setPublicId(tournamentDocFromUrl.publicId);
     setVisibility(tournamentDocFromUrl.visibility);
@@ -349,7 +362,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleSelectTournament = (doc: any) => {
-    setTournament(doc.data as Tournament);
+    setTournament(normalizeTournament(doc.data as Tournament));
     setTournamentDocId(doc._id as unknown as string);
     setPublicId(doc.publicId);
     setVisibility(doc.visibility);
@@ -761,7 +774,7 @@ const AdminDashboard: React.FC = () => {
 
             {activeTab === 'bracket' && (
               <div className="overflow-x-auto pb-8">
-                <BracketView matches={tournament.matches} teams={tournament.teams} />
+                <BracketView matches={tournament.matches} teams={tournament.teams} groups={tournament.groups} />
               </div>
             )}
           </div>
