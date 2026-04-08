@@ -172,21 +172,36 @@ export const updateTournamentKnockouts = (teams: Team[], matches: Match[], numGr
     });
 
     const totalQualified = qualifiedTeams.length;
-    
-    // Determine what knockout rounds we need
-    const needsRoundOf16 = totalQualified === 16;
-    const needsQuarterFinals = totalQualified === 8;
-    const needsSemiFinals = totalQualified === 4;
-    const needsFinalOnly = totalQualified === 2;
 
-    const hasRoundOf16 = updatedMatches.some(m => m.stage === Stage.QUARTER_FINAL && totalQualified === 16);
+    const needsRoundOf16 = totalQualified === 16;
+    const needsQuarterFinals = totalQualified >= 8;
+    const needsSemiFinals = totalQualified >= 4;
+    const needsFinal = totalQualified >= 2;
+
+    const hasRoundOf16 = updatedMatches.some(m => m.stage === Stage.ROUND_OF_16);
     const hasQuarters = updatedMatches.some(m => m.stage === Stage.QUARTER_FINAL);
     const hasSemis = updatedMatches.some(m => m.stage === Stage.SEMI_FINAL);
     const hasFinal = updatedMatches.some(m => m.stage === Stage.FINAL);
 
-    // --- Generate Round of 16 (if needed) ---
+    const getFinishedWinners = (stage: Stage, expectedMatches: number): Team[] | null => {
+        const stageMatches = updatedMatches.filter(m => m.stage === stage);
+        if (stageMatches.length !== expectedMatches) return null;
+        if (!stageMatches.every(m => m.status === MatchStatus.FINISHED)) return null;
+
+        const winners = stageMatches.map(match => {
+            const winnerId = getMatchWinner(match);
+            return winnerId ? teams.find(t => t.id === winnerId) ?? null : null;
+        });
+
+        if (winners.some(winner => winner === null)) {
+            return null;
+        }
+
+        return winners as Team[];
+    };
+
+    // --- Generate Round of 16 ---
     if (needsRoundOf16 && !hasRoundOf16) {
-        // Create 8 matches (16 teams)
         for (let i = 0; i < 8; i++) {
             updatedMatches.push({
                 id: generateId(),
@@ -195,129 +210,88 @@ export const updateTournamentKnockouts = (teams: Team[], matches: Match[], numGr
                 homeScore: null,
                 awayScore: null,
                 status: MatchStatus.SCHEDULED,
-                stage: Stage.QUARTER_FINAL // Using QUARTER_FINAL stage for Round of 16
+                stage: Stage.ROUND_OF_16
             });
         }
         return updatedMatches;
     }
 
     // --- Generate Quarter Finals ---
-    if ((needsRoundOf16 || needsQuarterFinals) && !hasQuarters) {
-        let quarterTeams: Team[] = [];
-        
-        if (needsRoundOf16) {
-            // Get winners from Round of 16
-            const roundOf16Matches = updatedMatches.filter(m => m.stage === Stage.QUARTER_FINAL && m.status === MatchStatus.FINISHED);
-            if (roundOf16Matches.length !== 8) return updatedMatches; // Not all R16 finished
-            
-            roundOf16Matches.forEach(match => {
-                const winnerId = getMatchWinner(match);
-                if (winnerId) {
-                    const winner = qualifiedTeams.find(t => t.id === winnerId);
-                    if (winner) quarterTeams.push(winner);
-                }
-            });
-        } else if (needsQuarterFinals) {
-            quarterTeams = qualifiedTeams;
+    if (needsQuarterFinals && !hasQuarters) {
+        const quarterTeams = needsRoundOf16
+            ? getFinishedWinners(Stage.ROUND_OF_16, 8)
+            : totalQualified === 8
+                ? qualifiedTeams
+                : null;
+
+        if (!quarterTeams || quarterTeams.length !== 8) {
+            return updatedMatches;
         }
 
-        if (quarterTeams.length === 8) {
-            // Create 4 quarter-final matches
-            for (let i = 0; i < 4; i++) {
-                updatedMatches.push({
-                    id: generateId(),
-                    homeTeamId: quarterTeams[i].id,
-                    awayTeamId: quarterTeams[7 - i].id,
-                    homeScore: null,
-                    awayScore: null,
-                    status: MatchStatus.SCHEDULED,
-                    stage: needsRoundOf16 ? Stage.SEMI_FINAL : Stage.QUARTER_FINAL // Adjust stage based on structure
-                });
-            }
+        for (let i = 0; i < 4; i++) {
+            updatedMatches.push({
+                id: generateId(),
+                homeTeamId: quarterTeams[i].id,
+                awayTeamId: quarterTeams[7 - i].id,
+                homeScore: null,
+                awayScore: null,
+                status: MatchStatus.SCHEDULED,
+                stage: Stage.QUARTER_FINAL
+            });
         }
         return updatedMatches;
     }
 
     // --- Generate Semi Finals ---
-    if ((needsRoundOf16 || needsQuarterFinals || needsSemiFinals) && !hasSemis) {
-        let semiTeams: Team[] = [];
-        
-        // Determine which matches to get winners from
-        let previousMatches: Match[] = [];
-        if (needsRoundOf16) {
-            previousMatches = updatedMatches.filter(m => m.stage === Stage.SEMI_FINAL && m.status === MatchStatus.FINISHED);
-        } else if (needsQuarterFinals) {
-            previousMatches = updatedMatches.filter(m => m.stage === Stage.QUARTER_FINAL && m.status === MatchStatus.FINISHED);
-        } else if (needsSemiFinals) {
-            semiTeams = qualifiedTeams;
+    if (needsSemiFinals && !hasSemis) {
+        const semiTeams = totalQualified === 4
+            ? qualifiedTeams
+            : getFinishedWinners(Stage.QUARTER_FINAL, 4);
+
+        if (!semiTeams || semiTeams.length !== 4) {
+            return updatedMatches;
         }
 
-        if (previousMatches.length > 0) {
-            if (previousMatches.length !== 4) return updatedMatches; // Not all previous round finished
-            
-            previousMatches.forEach(match => {
-                const winnerId = getMatchWinner(match);
-                if (winnerId) {
-                    const winner = teams.find(t => t.id === winnerId);
-                    if (winner) semiTeams.push(winner);
-                }
-            });
-        }
-
-        if (semiTeams.length === 4) {
-            // Create 2 semi-final matches
-            updatedMatches.push({
-                id: generateId(),
-                homeTeamId: semiTeams[0].id,
-                awayTeamId: semiTeams[3].id,
-                homeScore: null,
-                awayScore: null,
-                status: MatchStatus.SCHEDULED,
-                stage: Stage.SEMI_FINAL
-            });
-            updatedMatches.push({
-                id: generateId(),
-                homeTeamId: semiTeams[1].id,
-                awayTeamId: semiTeams[2].id,
-                homeScore: null,
-                awayScore: null,
-                status: MatchStatus.SCHEDULED,
-                stage: Stage.SEMI_FINAL
-            });
-        }
+        updatedMatches.push({
+            id: generateId(),
+            homeTeamId: semiTeams[0].id,
+            awayTeamId: semiTeams[3].id,
+            homeScore: null,
+            awayScore: null,
+            status: MatchStatus.SCHEDULED,
+            stage: Stage.SEMI_FINAL
+        });
+        updatedMatches.push({
+            id: generateId(),
+            homeTeamId: semiTeams[1].id,
+            awayTeamId: semiTeams[2].id,
+            homeScore: null,
+            awayScore: null,
+            status: MatchStatus.SCHEDULED,
+            stage: Stage.SEMI_FINAL
+        });
         return updatedMatches;
     }
 
     // --- Generate Final ---
-    if (!hasFinal) {
-        let finalists: Team[] = [];
-        
-        if (needsFinalOnly) {
-            finalists = qualifiedTeams;
-        } else {
-            const semiMatches = updatedMatches.filter(m => m.stage === Stage.SEMI_FINAL && m.status === MatchStatus.FINISHED);
-            if (semiMatches.length !== 2) return updatedMatches; // Semis not finished
-            
-            semiMatches.forEach(match => {
-                const winnerId = getMatchWinner(match);
-                if (winnerId) {
-                    const winner = teams.find(t => t.id === winnerId);
-                    if (winner) finalists.push(winner);
-                }
-            });
+    if (needsFinal && !hasFinal) {
+        const finalists = totalQualified === 2
+            ? qualifiedTeams
+            : getFinishedWinners(Stage.SEMI_FINAL, 2);
+
+        if (!finalists || finalists.length !== 2) {
+            return updatedMatches;
         }
 
-        if (finalists.length === 2) {
-            updatedMatches.push({
-                id: generateId(),
-                homeTeamId: finalists[0].id,
-                awayTeamId: finalists[1].id,
-                homeScore: null,
-                awayScore: null,
-                status: MatchStatus.SCHEDULED,
-                stage: Stage.FINAL
-            });
-        }
+        updatedMatches.push({
+            id: generateId(),
+            homeTeamId: finalists[0].id,
+            awayTeamId: finalists[1].id,
+            homeScore: null,
+            awayScore: null,
+            status: MatchStatus.SCHEDULED,
+            stage: Stage.FINAL
+        });
     }
 
     return updatedMatches;

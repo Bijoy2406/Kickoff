@@ -12,13 +12,12 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
   const getTeam = (id: string) => teams.find(t => t.id === id);
   
   const groupMatches = matches.filter(m => m.stage === Stage.GROUP);
+  const roundOf16 = matches.filter(m => m.stage === Stage.ROUND_OF_16);
   const quarters = matches.filter(m => m.stage === Stage.QUARTER_FINAL);
   const semis = matches.filter(m => m.stage === Stage.SEMI_FINAL);
   const final = matches.find(m => m.stage === Stage.FINAL);
-  
-  const groupA = groupMatches.filter(m => m.group === 'A');
-  const groupB = groupMatches.filter(m => m.group === 'B');
-
+  const groupNames = Array.from(new Set(groupMatches.map(m => m.group).filter(Boolean))) as string[];
+  const hasRoundOf16 = roundOf16.length > 0;
   const hasQuarters = quarters.length > 0;
 
   // Render Helpers
@@ -79,7 +78,7 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
 
   if (matches.length === 0) return <div className="text-center py-10 text-slate-500">Tournament not started.</div>;
 
-  const hasGroups = groupA.length > 0 || groupB.length > 0;
+  const hasGroups = groupNames.length > 0;
 
   return (
     <div className="p-8 overflow-x-auto min-w-full flex flex-col items-start">
@@ -102,25 +101,17 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
             {/* Column 0: Group Stage Matches (Collapsible) */}
             {hasGroups && isGroupsVisible && (
                 <div className="flex flex-col gap-8 shrink-0 relative animate-in slide-in-from-left-4 fade-in duration-300">
-                     {/* Group A */}
-                     {groupA.length > 0 && (
-                        <div className="bg-slate-900/40 p-3 rounded-xl border border-dashed border-slate-700">
-                             <div className="text-xs font-bold text-slate-500 uppercase mb-3 px-1">Group A Matches</div>
-                             <div className="flex flex-col gap-3">
-                                {groupA.map((m, i) => renderMatchNode(m, undefined, false, true))}
-                             </div>
-                        </div>
-                     )}
-                     
-                     {/* Group B */}
-                     {groupB.length > 0 && (
-                        <div className="bg-slate-900/40 p-3 rounded-xl border border-dashed border-slate-700">
-                             <div className="text-xs font-bold text-slate-500 uppercase mb-3 px-1">Group B Matches</div>
-                             <div className="flex flex-col gap-3">
-                                {groupB.map((m, i) => renderMatchNode(m, undefined, false, true))}
-                             </div>
-                        </div>
-                     )}
+                     {groupNames.map(groupName => {
+                        const matchesInGroup = groupMatches.filter(m => m.group === groupName);
+                        return (
+                            <div key={groupName} className="bg-slate-900/40 p-3 rounded-xl border border-dashed border-slate-700">
+                                 <div className="text-xs font-bold text-slate-500 uppercase mb-3 px-1">Group {groupName} Matches</div>
+                                 <div className="flex flex-col gap-3">
+                                    {matchesInGroup.map(match => renderMatchNode(match, undefined, false, true))}
+                                 </div>
+                            </div>
+                        );
+                     })}
 
                      {/* Arrow to Next Stage */}
                      <div className="absolute top-1/2 -right-10 transform -translate-y-1/2 text-slate-600">
@@ -131,22 +122,107 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
                 </div>
             )}
 
-            {/* Column 1: Quarter Finals (Optional) */}
+            {/* Column 1: Round of 16 (Optional) */}
+            {hasRoundOf16 && (
+                <div className="flex flex-col gap-8">
+                    <div className="flex flex-col gap-12 relative">
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[0], 'R16-1')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[1], 'R16-2')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-12 relative mt-8">
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[2], 'R16-3')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[3], 'R16-4')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-12 relative mt-8">
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[4], 'R16-5')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[5], 'R16-6')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-12 relative mt-8">
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[6], 'R16-7')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                        <div className="relative">
+                            {renderMatchNode(roundOf16[7], 'R16-8')}
+                            {hasQuarters && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Column 2: Quarter Finals (Optional) */}
             {hasQuarters && (
                 <div className="flex flex-col gap-8">
                     {/* QF Pair 1 -> Feeds SF1 */}
                     <div className="flex flex-col gap-12 relative">
                         <div className="relative">
                             {renderMatchNode(quarters[0], 'QF1')}
-                            <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
-                                <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
-                            </svg>
+                            {semis.length > 0 && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
                         </div>
                         <div className="relative">
                             {renderMatchNode(quarters[1], 'QF2')}
-                            <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
-                                <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
-                            </svg>
+                            {semis.length > 0 && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
                         </div>
                     </div>
 
@@ -154,21 +230,25 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
                     <div className="flex flex-col gap-12 relative mt-8">
                         <div className="relative">
                             {renderMatchNode(quarters[2], 'QF3')}
-                            <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
-                                <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
-                            </svg>
+                            {semis.length > 0 && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 60 L 60 60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
                         </div>
                         <div className="relative">
                             {renderMatchNode(quarters[3], 'QF4')}
-                            <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
-                                <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
-                            </svg>
+                            {semis.length > 0 && (
+                                <svg width="60" height="100" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                    <path d="M 0 0 L 30 0 L 30 -60 L 60 -60" stroke="#475569" strokeWidth="2" fill="none" />
+                                </svg>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Column 2: Semi Finals */}
+            {/* Column 3: Semi Finals */}
             {/* Only show if we have semis scheduled or finished */}
             {semis.length > 0 && (
                 <div className="flex flex-col gap-32"> 
@@ -176,23 +256,27 @@ export const BracketView: React.FC<BracketViewProps> = ({ matches, teams }) => {
                     <div className="relative">
                         {renderMatchNode(semis[0] || undefined, 'Semi Final 1')}
                         {/* Connect to Final */}
-                        <svg width="60" height="200" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
-                            <path d="M 0 0 L 30 0 L 30 100 L 60 100" stroke="#475569" strokeWidth="2" fill="none" />
-                        </svg>
+                        {final && (
+                            <svg width="60" height="200" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                <path d="M 0 0 L 30 0 L 30 100 L 60 100" stroke="#475569" strokeWidth="2" fill="none" />
+                            </svg>
+                        )}
                     </div>
 
                     {/* SF2 */}
                     <div className="relative">
                         {renderMatchNode(semis[1] || undefined, 'Semi Final 2')}
                         {/* Connect to Final */}
-                        <svg width="60" height="200" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
-                            <path d="M 0 0 L 30 0 L 30 -100 L 60 -100" stroke="#475569" strokeWidth="2" fill="none" />
-                        </svg>
+                        {final && (
+                            <svg width="60" height="200" className="absolute top-1/2 -right-16 z-0 pointer-events-none overflow-visible">
+                                <path d="M 0 0 L 30 0 L 30 -100 L 60 -100" stroke="#475569" strokeWidth="2" fill="none" />
+                            </svg>
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Column 3: Final */}
+            {/* Column 4: Final */}
             {final && (
                  <div className="relative">
                     {renderMatchNode(final || undefined, 'Grand Final', true)}

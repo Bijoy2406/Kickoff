@@ -82,7 +82,7 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
     if (matches.length === 0) return <div className="text-center text-slate-500 py-10">No matches scheduled yet.</div>;
 
     // Group matches by stage
-    const stageOrder = [Stage.FINAL, Stage.SEMI_FINAL, Stage.QUARTER_FINAL, Stage.GROUP];
+    const stageOrder = [Stage.FINAL, Stage.SEMI_FINAL, Stage.QUARTER_FINAL, Stage.ROUND_OF_16, Stage.GROUP];
     const groupedMatches = matches.reduce((acc, match) => {
         if (!acc[match.stage]) acc[match.stage] = [];
         acc[match.stage].push(match);
@@ -94,6 +94,7 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
             case Stage.FINAL: return "🏆 Final";
             case Stage.SEMI_FINAL: return "🔥 Semi Finals";
             case Stage.QUARTER_FINAL: return "⚔️ Quarter Finals";
+            case Stage.ROUND_OF_16: return "🎯 Round of 16";
             case Stage.GROUP: return "⚽ Group Stage";
             default: return stage;
         }
@@ -161,7 +162,7 @@ export const MatchesView: React.FC<MatchesViewProps> = ({ matches, teams, onUpda
                                         {/* Header with Status Badge */}
                                         <div className="flex justify-between items-center mb-4">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                                {match.stage.replace('_', ' ')} {match.group ? `• Grp ${match.group}` : ''}
+                                                {match.stage.replace(/_/g, ' ')} {match.group ? `• Grp ${match.group}` : ''}
                                             </span>
                                             {isFinished ? (
                                                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/30 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold shadow-[0_0_10px_rgba(16,185,129,0.1)]">
