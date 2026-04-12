@@ -39,7 +39,7 @@ export const calculateStandings = (teams: Team[], matches: Match[]): Team[] => {
         away.stats.drawn++;
         away.stats.points += 1;
       }
-      
+
       home.stats.gd = home.stats.gf - home.stats.ga;
       away.stats.gd = away.stats.gf - away.stats.ga;
     }
@@ -75,12 +75,12 @@ export const generateFixtures = (teams: Team[], type: TournamentType): Match[] =
   } else if (type === TournamentType.GROUPS_KNOCKOUT) {
     // Group Stage Logic
     const groups = Array.from(new Set(teams.map(t => t.group).filter(Boolean))) as string[];
-    
+
     groups.forEach(groupName => {
       const groupTeams = teams.filter(t => t.group === groupName);
       for (let i = 0; i < groupTeams.length; i++) {
         for (let j = i + 1; j < groupTeams.length; j++) {
-           matches.push({
+          matches.push({
             id: generateId(),
             homeTeamId: groupTeams[i].id,
             awayTeamId: groupTeams[j].id,
@@ -94,7 +94,7 @@ export const generateFixtures = (teams: Team[], type: TournamentType): Match[] =
       }
     });
   }
-  
+
   return matches;
 };
 
@@ -136,163 +136,216 @@ export const getFirstKnockoutRoundName = (numGroups: number, advancingPerGroup: 
 
 // Helper to determine winner including penalties
 export const getMatchWinner = (match: Match): string | null => {
-    if (match.homeScore === null || match.awayScore === null) return null;
-    if (match.homeScore > match.awayScore) return match.homeTeamId;
-    if (match.awayScore > match.homeScore) return match.awayTeamId;
-    
-    // Draw - Check Penalties
-    if (match.homePenalty !== undefined && match.awayPenalty !== undefined) {
-         if (match.homePenalty > match.awayPenalty) return match.homeTeamId;
-         if (match.awayPenalty > match.homePenalty) return match.awayTeamId;
-    }
-    return null;
+  if (match.homeScore === null || match.awayScore === null) return null;
+  if (match.homeScore > match.awayScore) return match.homeTeamId;
+  if (match.awayScore > match.homeScore) return match.awayTeamId;
+
+  // Draw - Check Penalties
+  if (match.homePenalty !== undefined && match.awayPenalty !== undefined) {
+    if (match.homePenalty > match.awayPenalty) return match.homeTeamId;
+    if (match.awayPenalty > match.homePenalty) return match.awayTeamId;
+  }
+  return null;
 };
 
-export const updateTournamentKnockouts = (teams: Team[], matches: Match[], numGroups: number = 2, advancingPerGroup: number = 2): Match[] => {
-    const updatedMatches = [...matches];
-    
-    const groupMatches = updatedMatches.filter(m => m.stage === Stage.GROUP);
-    const allGroupsFinished = groupMatches.length > 0 && groupMatches.every(m => m.status === MatchStatus.FINISHED);
+export const updateTournamentKnockouts = (
+  teams: Team[],
+  matches: Match[],
+  numGroups: number = 2,
+  advancingPerGroup: number = 2
+): Match[] => {
+  const updatedMatches = [...matches];
 
-    if (!allGroupsFinished) {
-        return updatedMatches; // Still in group stage
+  const groupMatches = updatedMatches.filter(m => m.stage === Stage.GROUP);
+  const allGroupsFinished = groupMatches.length > 0 && groupMatches.every(m => m.status === MatchStatus.FINISHED);
+
+  if (!allGroupsFinished) {
+    return updatedMatches;
+  }
+
+  const sortedTeams = calculateStandings(teams, updatedMatches);
+  const qualifiedTeams: Team[] = [];
+
+  const groupNames = Array.from(new Set(teams.map(t => t.group).filter(Boolean))) as string[];
+  groupNames.forEach(groupName => {
+    const groupTeams = sortedTeams.filter(t => t.group === groupName);
+    qualifiedTeams.push(...groupTeams.slice(0, advancingPerGroup));
+  });
+
+  const totalQualified = qualifiedTeams.length;
+
+  const needsRoundOf16 = totalQualified === 16;
+  const needsQuarterFinals = totalQualified >= 8;
+  const needsSemiFinals = totalQualified >= 4;
+  const needsFinal = totalQualified >= 2;
+
+  const setStageMatches = (stage: Stage, nextStageMatches: Match[]) => {
+    const remainingMatches = updatedMatches.filter(m => m.stage !== stage);
+    updatedMatches.length = 0;
+    updatedMatches.push(...remainingMatches, ...nextStageMatches);
+  };
+
+  const clearStageMatches = (stage: Stage): boolean => {
+    const hasStageMatches = updatedMatches.some(m => m.stage === stage);
+    if (hasStageMatches) {
+      setStageMatches(stage, []);
     }
+    return hasStageMatches;
+  };
 
-    // Get all qualified teams from groups
-    const sortedTeams = calculateStandings(teams, updatedMatches);
-    const qualifiedTeams: Team[] = [];
-    
-    // Get unique group names
-    const groupNames = Array.from(new Set(teams.map(t => t.group).filter(Boolean))) as string[];
-    
-    // Get top N teams from each group
-    groupNames.forEach(groupName => {
-        const groupTeams = sortedTeams.filter(t => t.group === groupName);
-        qualifiedTeams.push(...groupTeams.slice(0, advancingPerGroup));
+  const syncStagePairings = (
+    stage: Stage,
+    pairings: Array<{ homeTeamId: string; awayTeamId: string }>
+  ): boolean => {
+    const existingStageMatches = updatedMatches.filter(m => m.stage === stage);
+    let hasChanges = existingStageMatches.length !== pairings.length;
+
+    const syncedStageMatches = pairings.map((pairing, index) => {
+      const existingMatch = existingStageMatches[index];
+
+      if (!existingMatch) {
+        hasChanges = true;
+        return {
+          id: generateId(),
+          homeTeamId: pairing.homeTeamId,
+          awayTeamId: pairing.awayTeamId,
+          homeScore: null,
+          awayScore: null,
+          status: MatchStatus.SCHEDULED,
+          stage
+        };
+      }
+
+      const teamsChanged =
+        existingMatch.homeTeamId !== pairing.homeTeamId ||
+        existingMatch.awayTeamId !== pairing.awayTeamId;
+
+      if (!teamsChanged) {
+        return existingMatch;
+      }
+
+      hasChanges = true;
+      return {
+        ...existingMatch,
+        homeTeamId: pairing.homeTeamId,
+        awayTeamId: pairing.awayTeamId,
+        homeScore: null,
+        awayScore: null,
+        homePenalty: undefined,
+        awayPenalty: undefined,
+        status: MatchStatus.SCHEDULED
+      };
     });
 
-    const totalQualified = qualifiedTeams.length;
-
-    const needsRoundOf16 = totalQualified === 16;
-    const needsQuarterFinals = totalQualified >= 8;
-    const needsSemiFinals = totalQualified >= 4;
-    const needsFinal = totalQualified >= 2;
-
-    const hasRoundOf16 = updatedMatches.some(m => m.stage === Stage.ROUND_OF_16);
-    const hasQuarters = updatedMatches.some(m => m.stage === Stage.QUARTER_FINAL);
-    const hasSemis = updatedMatches.some(m => m.stage === Stage.SEMI_FINAL);
-    const hasFinal = updatedMatches.some(m => m.stage === Stage.FINAL);
-
-    const getFinishedWinners = (stage: Stage, expectedMatches: number): Team[] | null => {
-        const stageMatches = updatedMatches.filter(m => m.stage === stage);
-        if (stageMatches.length !== expectedMatches) return null;
-        if (!stageMatches.every(m => m.status === MatchStatus.FINISHED)) return null;
-
-        const winners = stageMatches.map(match => {
-            const winnerId = getMatchWinner(match);
-            return winnerId ? teams.find(t => t.id === winnerId) ?? null : null;
-        });
-
-        if (winners.some(winner => winner === null)) {
-            return null;
-        }
-
-        return winners as Team[];
-    };
-
-    // --- Generate Round of 16 ---
-    if (needsRoundOf16 && !hasRoundOf16) {
-        for (let i = 0; i < 8; i++) {
-            updatedMatches.push({
-                id: generateId(),
-                homeTeamId: qualifiedTeams[i].id,
-                awayTeamId: qualifiedTeams[15 - i].id,
-                homeScore: null,
-                awayScore: null,
-                status: MatchStatus.SCHEDULED,
-                stage: Stage.ROUND_OF_16
-            });
-        }
-        return updatedMatches;
+    if (hasChanges) {
+      setStageMatches(stage, syncedStageMatches);
     }
 
-    // --- Generate Quarter Finals ---
-    if (needsQuarterFinals && !hasQuarters) {
-        const quarterTeams = needsRoundOf16
-            ? getFinishedWinners(Stage.ROUND_OF_16, 8)
-            : totalQualified === 8
-                ? qualifiedTeams
-                : null;
+    return hasChanges;
+  };
 
-        if (!quarterTeams || quarterTeams.length !== 8) {
-            return updatedMatches;
-        }
+  const getFinishedWinners = (stage: Stage, expectedMatches: number): Team[] | null => {
+    const stageMatches = updatedMatches.filter(m => m.stage === stage);
+    if (stageMatches.length !== expectedMatches) return null;
+    if (!stageMatches.every(m => m.status === MatchStatus.FINISHED)) return null;
 
-        for (let i = 0; i < 4; i++) {
-            updatedMatches.push({
-                id: generateId(),
-                homeTeamId: quarterTeams[i].id,
-                awayTeamId: quarterTeams[7 - i].id,
-                homeScore: null,
-                awayScore: null,
-                status: MatchStatus.SCHEDULED,
-                stage: Stage.QUARTER_FINAL
-            });
-        }
-        return updatedMatches;
+    const winners = stageMatches.map(match => {
+      const winnerId = getMatchWinner(match);
+      return winnerId ? teams.find(t => t.id === winnerId) ?? null : null;
+    });
+
+    if (winners.some(winner => winner === null)) {
+      return null;
     }
 
-    // --- Generate Semi Finals ---
-    if (needsSemiFinals && !hasSemis) {
-        const semiTeams = totalQualified === 4
-            ? qualifiedTeams
-            : getFinishedWinners(Stage.QUARTER_FINAL, 4);
+    return winners as Team[];
+  };
 
-        if (!semiTeams || semiTeams.length !== 4) {
-            return updatedMatches;
-        }
+  if (needsRoundOf16) {
+    const roundOf16Pairings = Array.from({ length: 8 }, (_, i) => ({
+      homeTeamId: qualifiedTeams[i].id,
+      awayTeamId: qualifiedTeams[15 - i].id
+    }));
 
-        updatedMatches.push({
-            id: generateId(),
-            homeTeamId: semiTeams[0].id,
-            awayTeamId: semiTeams[3].id,
-            homeScore: null,
-            awayScore: null,
-            status: MatchStatus.SCHEDULED,
-            stage: Stage.SEMI_FINAL
-        });
-        updatedMatches.push({
-            id: generateId(),
-            homeTeamId: semiTeams[1].id,
-            awayTeamId: semiTeams[2].id,
-            homeScore: null,
-            awayScore: null,
-            status: MatchStatus.SCHEDULED,
-            stage: Stage.SEMI_FINAL
-        });
-        return updatedMatches;
+    const roundOf16Changed = syncStagePairings(Stage.ROUND_OF_16, roundOf16Pairings);
+    if (roundOf16Changed) {
+      clearStageMatches(Stage.QUARTER_FINAL);
+      clearStageMatches(Stage.SEMI_FINAL);
+      clearStageMatches(Stage.FINAL);
+    }
+  } else {
+    clearStageMatches(Stage.ROUND_OF_16);
+  }
+
+  if (needsQuarterFinals) {
+    const quarterTeams = needsRoundOf16
+      ? getFinishedWinners(Stage.ROUND_OF_16, 8)
+      : totalQualified === 8
+        ? qualifiedTeams
+        : null;
+
+    if (!quarterTeams || quarterTeams.length !== 8) {
+      return updatedMatches;
     }
 
-    // --- Generate Final ---
-    if (needsFinal && !hasFinal) {
-        const finalists = totalQualified === 2
-            ? qualifiedTeams
-            : getFinishedWinners(Stage.SEMI_FINAL, 2);
+    const quarterPairings = Array.from({ length: 4 }, (_, i) => ({
+      homeTeamId: quarterTeams[i].id,
+      awayTeamId: quarterTeams[7 - i].id
+    }));
 
-        if (!finalists || finalists.length !== 2) {
-            return updatedMatches;
-        }
+    const quarterChanged = syncStagePairings(Stage.QUARTER_FINAL, quarterPairings);
+    if (quarterChanged) {
+      clearStageMatches(Stage.SEMI_FINAL);
+      clearStageMatches(Stage.FINAL);
+    }
+  } else {
+    clearStageMatches(Stage.QUARTER_FINAL);
+    clearStageMatches(Stage.SEMI_FINAL);
+    clearStageMatches(Stage.FINAL);
+  }
 
-        updatedMatches.push({
-            id: generateId(),
-            homeTeamId: finalists[0].id,
-            awayTeamId: finalists[1].id,
-            homeScore: null,
-            awayScore: null,
-            status: MatchStatus.SCHEDULED,
-            stage: Stage.FINAL
-        });
+  if (needsSemiFinals) {
+    const semiTeams = totalQualified === 4
+      ? qualifiedTeams
+      : getFinishedWinners(Stage.QUARTER_FINAL, 4);
+
+    if (!semiTeams || semiTeams.length !== 4) {
+      return updatedMatches;
     }
 
-    return updatedMatches;
+    const semiPairings = [
+      {
+        homeTeamId: semiTeams[0].id,
+        awayTeamId: semiTeams[3].id
+      },
+      {
+        homeTeamId: semiTeams[1].id,
+        awayTeamId: semiTeams[2].id
+      }
+    ];
+
+    const semisChanged = syncStagePairings(Stage.SEMI_FINAL, semiPairings);
+    if (semisChanged) {
+      clearStageMatches(Stage.FINAL);
+    }
+  } else {
+    clearStageMatches(Stage.SEMI_FINAL);
+    clearStageMatches(Stage.FINAL);
+  }
+
+  if (needsFinal) {
+    const finalists = totalQualified === 2
+      ? qualifiedTeams
+      : getFinishedWinners(Stage.SEMI_FINAL, 2);
+
+    if (!finalists || finalists.length !== 2) {
+      return updatedMatches;
+    }
+
+    syncStagePairings(Stage.FINAL, [{ homeTeamId: finalists[0].id, awayTeamId: finalists[1].id }]);
+  } else {
+    clearStageMatches(Stage.FINAL);
+  }
+
+  return updatedMatches;
 };
